@@ -1,0 +1,3 @@
+(library
+  (name go2b)
+  (modules misc syntax sem))
