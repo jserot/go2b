@@ -77,6 +77,8 @@ let rec eval_atom f a =
 
 exception Unsupported_instr of Syntax.instr
                              
+exception Aie of string * Syntax.atom
+               
 let rec eval_instr o f s = 
   let open Syntax in
   match s with 
@@ -85,9 +87,12 @@ let rec eval_instr o f s =
   | Return a when f.pc = "" ->
      let v = eval_atom f a in
      { f with res = v; pc = f.stopc }
-  | Assign (x,a) when List.mem_assoc x f.lvars ->
-     let v = eval_atom f a in
-     { f with lvars = Misc.update_assoc f.lvars (x,v) }
+  | Assign (x,a) ->
+     if List.mem_assoc x f.lvars then
+       let v = eval_atom f a in
+       { f with lvars = Misc.update_assoc f.lvars (x,v) }
+     else
+       raise (Aie (x,a))
   | Cond (a, s, s') ->
      begin match eval_atom f a with
      | Bool true -> eval_instr o f s
