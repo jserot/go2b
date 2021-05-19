@@ -106,10 +106,11 @@ let rec eval_instr o f s =
 (* O,F |-block b => v, t *)
 
 let eval_block o f s =
-  let _ = o,s in f  (* TO BE FIXED *)
-  (* let f' = eval_instr o { f with pc = "" } s in
-   * if f'.pc = "" then (\* Continue *\)
-   *   { f with  *)
+  let f' = eval_instr o { f with pc = "" } s in
+  if f'.pc = "" then (* Continue *)
+    { f' with pc = f.pc; time = f'.time + 1 }
+  else               (* Next *)
+    { f' with time = f'.time + 1 }
 
 (* O,F |-blocks b1, ..., bn => v, t *)
 
