@@ -81,10 +81,7 @@ let rec eval_atom f a =
 (* O,F |-stat s => F' *)
 
 exception Unsupported_instr of Syntax.instr
-                             
 exception Match_fail of Syntax.const
-
-exception Aie of string * Syntax.atom
                
 let rec eval_instr o f s = 
   let open Syntax in
@@ -95,11 +92,11 @@ let rec eval_instr o f s =
      let v = eval_atom f a in
      { f with res = v; pc = f.stopc }
   | Assign (x,a) ->
-     (* if List.mem_assoc x f.lvars then *)  (* TO BE FIXED ! *) 
+     if List.mem_assoc x f.lvars then 
        let v = eval_atom f a in
        { f with lvars = Misc.update_assoc f.lvars (x,v) }
-     (* else
-      *   raise (Aie (x,a)) *)
+     else
+       failwith "Sem.eval_instr.assign" (* should not happen *)
   | Cond (a, s, s') ->
      begin match eval_atom f a with
      | Bool true -> eval_instr o f s
@@ -160,7 +157,7 @@ let rec eval_machine o m =
      begin match lookup id o with
      | Clos ((xs, MCompute (ys, s, bs)), o') ->
         let l = Syntax.new_label () in
-        let m' = MCompute (ys, Par (List.map2 (fun x a -> Assign (x,a)) xs args @ [Goto l]),  (l,s)::bs) in
+        let m' = MCompute (xs @ ys, Par (List.map2 (fun x a -> Assign (x,a)) xs args @ [Goto l]),  (l,s)::bs) in
         eval_machine o' m'
      | _ -> failwith "eval_machine"
      end
