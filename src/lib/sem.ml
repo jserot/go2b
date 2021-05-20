@@ -82,6 +82,8 @@ let rec eval_atom f a =
 
 exception Unsupported_instr of Syntax.instr
                              
+exception Match_fail of Syntax.const
+
 exception Aie of string * Syntax.atom
                
 let rec eval_instr o f s = 
@@ -104,6 +106,17 @@ let rec eval_instr o f s =
      | Bool false -> eval_instr o f s'
      | _ -> failwith "Illegal cond"
      end
+  | Match (a, cases) ->
+     let c =
+       begin match eval_atom f a  with
+             | Int i -> CInt i
+             | Bool b -> CBool b
+             | _ -> failwith "Illegal match"
+       end in
+     let s =
+       try List.assoc c cases 
+       with Not_found -> raise (Match_fail c) in
+     eval_instr o f s
   | Let (m, d, s) ->
      let o' = Misc.update_assoc o (m, Clos (d,o)) in
      eval_instr o' f s

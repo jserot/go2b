@@ -22,7 +22,7 @@ and instr =
   | Assign of var * atom
   | Par of instr list
   | Cond of atom * instr * instr
-  (* | Match of atom * (const * instr) list *)
+  | Match of atom * (const * instr) list
   | Goto of label
   | Return of atom
   | Let of var * mdecl * instr  (* let m = fun (x1, ..., xn) -> M in s *)
