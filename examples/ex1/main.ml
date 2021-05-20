@@ -1,17 +1,9 @@
 open Go2b
 open Syntax
-
-let m_incr =
-  (* compute var x in [x<=n || goto l] with l:return x+1 *)
-  MCompute (
-      ["x"],
-      Par [Assign ("x", AVar "n"); Goto "l" ],
-      ["l", Return (APrimApp ("+", [AVar "x"; AConst (CInt 1)]))]
-    )
-                                  
+                               
 let p = {
-    decls = [ MDecl ("incr", (["n"], m_incr)); ];
-    entry = ("incr", [CInt 2])
+    decls = [];
+    entry = Atom (AConst (CInt 42))
   }
 
 let _ = 

@@ -1,27 +1,43 @@
-type genv = (Syntax.ident * mclos) list  (* Omega *)
+type env = (Syntax.ident * semval) list
 
-and mclos = Clos of Syntax.mdecl * genv        
-
-type semval =
-  | Int of int
-  | Bool of bool
-  | Unknown
+and semval =
+  | Value of Syntax.const
+  | Clos of Syntax.func * env
+  | OLabel of Syntax.label
+  | SNone
+let string_of_object = function
+  | Value v -> Syntax.string_of_const v
+  | Clos (_,_) -> "<closure>"
+  | OLabel l -> l
+  | SNone -> invalid_arg "string_of_object"
 
 let string_of_val = function
-  | Int i -> string_of_int i
-  | Bool b -> string_of_bool b
-  | Unknown -> "<unknown>"
-             
+| Value _ as v -> string_of_object v
+| _ -> invalid_arg "string_of_val"     
 let encode_int n =
-    Int n
+    Value(Syntax.CInt n)
+
 let decode_int = function
-  | Int n -> n
+  | Syntax.(Value(CInt n)) -> n
   | _ -> failwith "Builtins.decode_int" (* should not happen *)
+
 let encode_bool b =
-    Bool b
+    Syntax.(Value(CBool b))
+
 let decode_bool = function
-  | Bool b -> b
-  | _ -> failwith "Builtins.decode bool" (* should not happen *)
+  | Value(Syntax.CInt b) -> b
+  | _ -> failwith "Builtins.decode_bool" (* should not happen *)
+
+let decode_clos = function
+  | Clos (f,r) -> (f,r)
+  | _ -> failwith "Builtins.decode_clos" (* should not happen *)
+
+let encode_clos l =
+    OLabel l
+
+let decode_label = function
+  | OLabel l -> l
+  | _ -> failwith "Builtins.decode_label" (* should not happen *)
 
 let prim1 encode op decode =
   function v -> encode (op (decode v))
@@ -41,150 +57,127 @@ let primitives = [
     "!=", (2, prim2 encode_bool ( <> ) decode_int decode_int);
     "<",  (2, prim2 encode_bool ( < ) decode_int decode_int);
     ">",  (2, prim2 encode_bool ( > ) decode_int decode_int);
+    "<=",  (2, prim2 encode_bool ( <= ) decode_int decode_int);
   ]
 
-type frame = { (* bloc d'activation *)
-    lvars: (Syntax.var * semval) list;
-    pc: Syntax.label;
-    stopc: Syntax.label;
-    res: semval;
-    time: int
-  }
+let pc_register = "pc"
+let res_register = "res"
+
 
 exception Unknown_id of Syntax.ident
 exception Unknown_prim of Syntax.ident
 exception Illegal_prim_app of Syntax.ident * Syntax.atom list
                       
-let lookup v env =
-  try List.assoc v env
+let lookup v r =
+  try List.assoc v r
   with Not_found -> raise (Unknown_id v)
 
 let lookup_prim p =
   try List.assoc p primitives 
   with Not_found -> raise (Unknown_id p)
 
-(* F |-atom a => v *)
+(* r |-atom a => v *)
                   
-let rec eval_atom f a =
+let rec eval_atom r a =
   let open Syntax in
   match a with
-  | AConst (CInt i) -> Int i
-  | AConst (CBool b) -> Bool b
-  | AVar x -> lookup x f.lvars
+  | AConst (CInt i) -> Value (CInt i)
+  | AConst (CBool b) -> Value (CBool b)
+  | AVar x -> lookup x r
   | APrimApp (p, args) ->
      let n, op = lookup_prim p in
-     let vs = List.map (eval_atom f) args in
+     let vs = List.map (eval_atom r) args in
      if List.length args = n
      then op vs
      else raise (Illegal_prim_app (p,args))
                                         
-(* O,F |-stat s => F' *)
 
-exception Unsupported_instr of Syntax.instr
 exception Match_fail of Syntax.const
-               
-let rec eval_instr o f s = 
+     
+(* r |-stat b => p *)
+let eval_instr r s = 
   let open Syntax in
   match s with 
-  | Goto l' when f.pc = "" ->
-      { f with pc = l' }   (* "" = none *)
-  | Return a when f.pc = "" ->
-     let v = eval_atom f a in
-     { f with res = v; pc = f.stopc }
-  | Assign (x,a) ->
-     if List.mem_assoc x f.lvars then 
-       let v = eval_atom f a in
-       { f with lvars = Misc.update_assoc f.lvars (x,v) }
-     else
-       failwith "Sem.eval_instr.assign" (* should not happen *)
-  | Cond (a, s, s') ->
-     begin match eval_atom f a with
-     | Bool true -> eval_instr o f s
-     | Bool false -> eval_instr o f s'
+  | Goto l -> ("pc",OLabel l)
+  | Assign (x,a) -> (x,eval_atom r a)
+
+(* L,r |-block b => p,t *)
+let rec eval_block ls r b =
+  let open Syntax in
+  match b with   
+  | Atom a -> 
+    let v = eval_atom r a in
+    let r' = Misc.update_assoc r (res_register,v) in
+    r',0 
+  | Apply (x,args) -> 
+    let vs = List.map (eval_atom r) args in
+    
+    (match lookup x r with
+     | Clos((xs,b),r') ->
+        let bs = List.combine xs vs in
+        let r'' = List.fold_left Misc.update_assoc r' bs in
+        let v,t = eval_return r'' b in
+        let rr = Misc.update_assoc r (res_register,v) in
+        rr,t
+    | _ -> failwith "Illegal app") 
+  | Cond (a, b, b') ->
+     begin match eval_atom r a with
+     | Value (CBool true) -> eval_block ls r b
+     | Value (CBool false) -> eval_block ls r b'
      | _ -> failwith "Illegal cond"
      end
   | Match (a, cases) ->
      let c =
-       begin match eval_atom f a  with
-             | Int i -> CInt i
-             | Bool b -> CBool b
+       begin match eval_atom r a  with
+             | Value c -> c
              | _ -> failwith "Illegal match"
        end in
-     let s =
-       try List.assoc c cases 
+     let b =
+       try List.assoc c cases
        with Not_found -> raise (Match_fail c) in
-     eval_instr o f s
-  | Let (m, d, s) ->
-     let o' = Misc.update_assoc o (m, Clos (d,o)) in
-     eval_instr o' f s
+     eval_block ls r b
+  | Labels (bs,b) ->
+      let ls' = bs @ ls in
+      eval_block ls' r b
+  | Sync (bs,b) ->
+    let bs = List.map (fun (x,b) -> x, eval_return r b) bs in (* Note: left-to-right evaluation order here *)
+    let t = List.fold_left (fun t (_,(_,t')) -> max t t') 0 bs in
+    let bs = List.map (fun (x,(v,_)) -> (x,v)) bs in
+    let r' = List.fold_left Misc.update_assoc r bs in
+    let r'',t' = eval_block ls r' b in
+    r'',(t+t')
   | Par ss ->
-     List.fold_left (eval_instr o) f ss  (* Note: left-to-right evaluation order here *)
-  (* TODO : Match and ... MORE IMPORTANTLY: Join ! *)
-  | _ ->
-     raise (Unsupported_instr s)
-     
-(* O,F |-block b => v, t *)
+     let r0 = Misc.update_assoc r (pc_register,SNone) in
+     let r1 = Misc.update_assoc r0 (res_register,SNone) in
+     let bs = List.map (eval_instr r1) ss in (* Note: left-to-right evaluation order here *)
+     let r' = List.fold_left Misc.update_assoc r1 bs in 
+     (match lookup pc_register r' with
+            | SNone -> failwith "Illegal Par" (* goto mandatory *)
+            | OLabel _ as l -> 
+                let b = lookup (decode_label l) ls in 
+                let (r'',t) = eval_block ls r' b in (* c'est bien [r'] *)
+                r'',(1+t)
+            | _ -> assert false)
 
-let eval_block o f s =
-  let f' = eval_instr o { f with pc = "" } s in
-  if f'.pc = "" then (* Continue *)
-    { f' with pc = f.pc; time = f'.time + 1 }
-  else               (* Next *)
-    { f' with time = f'.time + 1 }
+(* r |-return b => v,t *)
+and eval_return r b =
+  let r',t = eval_block [] r b in
+  match lookup res_register r' with
+  | Clos _ -> failwith "Illegal return"
+  | v -> v,t
 
-(* O,F |-blocks b1, ..., bn => v, t *)
+(* r |-prog => v, t *)
 
-exception Unknown_label of Syntax.label
-                         
-let lookup_block l bs =
-  try List.assoc l bs
-  with Not_found -> raise (Unknown_label l)
-
-let rec eval_blocks o f bs = 
-  if f.pc = f.stopc then    (* End *)
-    f.res, f.time
-  else                      (* Blocks *)
-    let b = lookup_block f.pc bs in
-    let f' = eval_block o f b in
-    eval_blocks o f' bs
-
-(* O |-machine M => v, t *)
-
-let rec eval_machine o m =
-  let open Syntax in
-  match m with
-  | MInst (id, args) -> (* Instance *)
-     begin match lookup id o with
-     | Clos ((xs, MCompute (ys, s, bs)), o') ->
-        let l = Syntax.new_label () in
-        let m' = MCompute (xs @ ys, Par (List.map2 (fun x a -> Assign (x,a)) xs args @ [Goto l]),  (l,s)::bs) in
-        eval_machine o' m'
-     | _ -> failwith "eval_machine"
-     end
-  | MCompute (ys, s, bs) -> (* Compute *)
-     let l = new_label () in
-     let l' = new_label () in
-     let fi = { (* F_init *)
-         pc = l;
-         stopc = l';
-         time = 0;
-         lvars = List.map (fun y -> y, Unknown) ys;
-         res = Unknown } in
-     eval_blocks o fi ([l,s] @ bs @ [l', Nil])
-      
-(* O |-prog => v, t *)
-
-let eval_global_decl o decl =   (* Global Let *)
+let eval_fun_decl r decl =   (* Global Let *)
   let open Syntax in
   match decl with
-  | MDecl (id, md) -> (id, Clos (md,o))::o 
+  | FunDecl (id, f) -> (id, Clos (f,r))::r
 
-let eval_global_decls o decls =
-  List.fold_left eval_global_decl o decls
+let eval_global_decls p decls =
+  List.fold_left eval_fun_decl p decls
   
 let eval_prog p =
   let open Syntax in
   let initial_env = [] in  
-  let o = eval_global_decls initial_env p.decls in
-  let id, args = p.entry in
-  eval_machine o (MInst (id, List.map (fun c -> AConst c) args))   (* Main *)
+  let r = eval_global_decls initial_env p.decls in
+  eval_return r p.entry

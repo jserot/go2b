@@ -1,25 +1,24 @@
 open Go2b
 open Syntax
 
-let m_fact =
-  MCompute (
-      ["acc"; "n"],
-      Par [
-            Assign ("acc", AConst (CInt 1)); 
-            Assign ("n", AVar "N");
-            Goto "f"
-          ],
-      ["f", Cond (APrimApp ("=", [AVar "n"; AConst (CInt 0)]),
-                     Return (AVar "acc"),
-                     Par [Assign ("acc", APrimApp ("*", [AVar "acc"; AVar "n"]));
-                          Assign ("n", APrimApp ("-", [AVar "n"; AConst (CInt 1)]))])]
-    )
-                                  
+let f_even = 
+  let_ "IsEven"
+    (func ["n"] 
+      (labels 
+        [ "even", if_ (prim "<=" [var "n"; int 0])
+                      (a_ (bool true))
+                      (par [ "n" <= (prim "-" [var "n"; int 1]) ; 
+                                  goto "odd"]) ;
+          "odd",  if_ (prim "<=" [var "n"; int 0])
+                      (a_ (bool false))
+                      (par [ "n" <= (prim "-" [var "n"; int 1]) ; 
+                                  goto "even"]) 
+        ]
+        (par [goto "even"])))
+                             
 let p = {
-    decls = [
-      MDecl ("fact", (["N"], m_fact));
-    ];
-    entry = ("fact", [CInt 5])
+    decls = [ f_even ];
+    entry = app "IsEven" [int 42]
   }
 
 let _ = 

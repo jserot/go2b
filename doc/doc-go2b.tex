@@ -1,0 +1,458 @@
+%%% Loïc Sylvestre, M2 STL -- Sorbonne Université.
+
+\documentclass[11pt]{article}
+\usepackage[frenchb]{babel}
+\usepackage[utf8x]{inputenc}
+\usepackage[T1]{fontenc} 
+\usepackage{mathtools}
+\usepackage{stmaryrd}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{stmaryrd}
+\usepackage{textcomp}
+\usepackage{mathpartir}
+\usepackage{listings}
+\usepackage{cite}
+\usepackage{xcolor}
+\usepackage{caption}
+\usepackage{hyperref}
+\hypersetup{colorlinks=true,allcolors=blue}
+\usepackage{graphicx}
+
+\usepackage{geometry}
+\geometry{top=2cm,left=2.5cm, right=2.5cm}
+
+% enlever l'indentation en début de paragraphe
+\setlength{\parindent}{0cm}
+
+\newcommand{\FORGET}[1]{}
+\newcommand{\TODO}[1]{{\color{red}\textbf{<TODO:}~#1\textbf{>}}}
+\newcommand{\REMARQUE}[1]{{\color{blue}\textbf{remarque :} #1}}
+
+\lstset{
+  xleftmargin=2cm,
+  basicstyle=\small\sffamily,
+  keywordstyle=\textbf,
+  mathescape,
+  literate=%
+  % {`}{\textasciigrave}1
+  {~}{$\sim$}1
+  {é}{{\'e}}{1}
+  {è}{{\`e}}{1}
+  {ù}{{\`u}}{1}
+  {à}{{\`a}}{1}
+  {ê}{{\^e}}{1}%,
+}
+
+
+% mots-clés
+\newcommand{\kw}[1]{\textbf{#1}}
+
+% double crochets
+\newcommand{\sem}[1]{\llbracket #1\rrbracket}
+
+\newcommand{\pair}[1]{\langle#1\rangle}
+
+\newcommand{\sor}{
+  \mathrel{\makebox[\widthof{$\Coloneqq$}]{$|$}}%
+}
+
+\newcommand{\envExtend}[3]{#1[#2 \mapsto #3]}
+
+%%%% jugements sémantiques
+
+\newcommand{\Frame}{\mathcal{F}}
+\newcommand{\Block}{\mathcal{B}}
+\newcommand{\Labels}{\mathcal{L}}
+\newcommand{\bigStep}[4]{#1 \vdash_{\textsf{#2}} #3 \Rightarrow #4}
+\newcommand{\GTBsemProg}[3]{\bigStep{#1}{prog}{#2}{#3}}
+\newcommand{\GTBsemFun}[3]{\bigStep{#1}{function}{#2}{#3}}
+\newcommand{\GTBsemBlock}[3]{\bigStep{#1}{block}{#2}{#3}}
+\newcommand{\GTBsemeval}[3]{\bigStep{#1}{eval}{#2}{#3}}
+
+\newcommand{\GTBsemBlocks}[3]{\bigStep{#1}{labels}{#2}{#3}}
+\newcommand{\GTBsemStat}[3]{\bigStep{#1}{stat}{#2}{#3}}
+\newcommand{\GTBsemPar}[3]{\bigStep{#1}{par}{#2}{#3}}
+\newcommand{\GTBsemAtom}[3]{\bigStep{#1}{atom}{#2}{#3}}
+\newcommand{\GTBsemPrim}[2]{\bigStep{}{prim}{#1}{#2}}
+\newcommand{\ArrowLoop}{\xRightarrow{\infty}}
+\newcommand{\bigStepLoop}[3]{#1 \vdash_{\textsf{#2}} #3 \ArrowLoop}
+\newcommand{\GTBsemProgLoop}[2]{\bigStepLoop{#1}{prog}{#2}}
+\newcommand{\GTBsemFunLoop}[2]{\bigStepLoop{#1}{machine}{#2}}
+\newcommand{\GTBsemBlocksLoop}[2]{\bigStepLoop{#1}{blocks}{#2}}
+
+\begin{document}
+%\tableofcontents
+\section{\textsf{GO2B}}
+
+%\textsf{GO2B} est un langage de description de circuits séquentiels synchrones qui a pour objectif de permettre une programmation sûre, efficace et expressive de circuits reprogrammables de type FPGA.
+%Il tente de concilier programmation fonctionnelle, structures de contrôles impératives et 
+
+\REMARQUE{...}
+\newcommand{\BNFsection}[1]{&&&\textbf{#1}}
+\newcommand{\BNFeqq}[3]{#1&\Coloneqq#2&&\text{#3}}
+\newcommand{\BNFcase}[2]{&\sor#1&&\text{#2}}
+
+\subsection{Syntaxe}
+La figure~\ref{GOTOB-Syntax} donne la syntaxe de \textsf{GO2B}.
+
+\begin{figure}[!h]
+  \centering
+  \footnotesize 
+  \fbox{%
+    $\begin{aligned}
+      \BNFsection{programme} \\
+      \BNFeqq {\pi}
+              {\kw{let}~X = f\kw{;;}~\pi}
+              {déclaration de fonction}\\
+      %%%    &\sor f | X && \text{fonction}\\ %%% fonction appelée depuis OCaml
+      \BNFcase{\Block}
+              {corps du programme}\\[2ex]
+      %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%      
+      \BNFeqq{f}
+             {\kw{fun}~(x_1,\cdots x_n) \rightarrow \Block}
+             {\bf fonction}\\[2ex]
+      %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+      \BNFsection{bloc}\\
+      \BNFeqq{\Block}
+             {\Coloneqq a}
+             {atome}\\
+      \BNFcase{X(a_1,\cdots a_n)}
+              {appel de fonction}\\
+      \BNFcase{\kw{if}~a~\kw{then}~\Block~\kw{else}~\Block'}
+              {conditionnelle}\\
+      \BNFcase{\kw{match}~a~\kw{with}~%
+                c_1 \rightarrow \Block_1~%
+                \textbf{|}~\cdots~%
+                c_n \rightarrow \Block_n}
+              {traitement par cas}\\
+      \BNFcase{\kw{labels}~%
+                       \ell_1:\Block_1~%
+                       \cdots~%
+                       \ell_n:~\Block_n~%
+                     \kw{in}~\Block}
+              {déclaration de blocs}\\
+      \BNFcase{\kw{sync}~x_1 = \Block_1~%
+               \kw{and}~\cdots~x_n = \Block_n~%
+               \kw{in}~\Block}
+              {barrière de synchronisation}\\
+      \BNFcase{\Block~;~\Block'}
+              {séquence}\\
+      \BNFcase{[ s_1~\|~\cdots~s_n ]}
+              {composition parallèle}\\[2ex]
+      %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+      \BNFsection{instruction} \\
+      \BNFeqq{s}{x \leftarrow a}
+                {assignation}\\ 
+      %%\BNFcase {x.(a) \leftarrow a'}
+      %%         {\text{assignation (tableaux)}\\ 
+      \BNFcase{\kw{goto}~\ell}
+             {branchement}\\[2ex]
+      %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+      \BNFsection{atome}\\
+      \BNFeqq{a}{c}{constante} \\
+      \BNFcase{x}{occurence de variable}\\
+      \BNFcase{p~e_1~\dots~e_n}{application de primitive}\\[2ex]
+      %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    \end{aligned}$%
+  }
+  \caption{Syntaxe de \textsf{GO2B}}
+  \label{GOTOB-Syntax}
+\end{figure}
+
+\textsf{GO2B} est un langage de blocs : le corps d'un 
+programme est un bloc. L'exécution d'un bloc produit 
+une valeur. La construction de bloc la plus élémentaire 
+est appelée \emph{atome} : c'est une expression combinatoire 
+(eg. $42$). On note librement les  primitives usuelles 
+$=, +,-, \times, \ge, \cdots$ de façon infixe (eg. $x + 1$). 
+Une fonction est un bloc paramétré par des atomes 
+(eg. $\kw{fun}~x \rightarrow x + 1$). Les fonctions sont déclarées 
+globalement en début de programme  (eg. $\kw{let}~F(x,y) = x + y$). 
+L'application de fonction à des atomes est un bloc (eg. $F(1,2+3)$). 
+Le langage de blocs comprend deux structures de contrôle standards : 
+la conditionnelle d'une part (eg. $\kw{if}~x \ge 0~\kw{then}~x~\kw{else} -x)$, 
+et le traitement par cas d'autre part (eg. $\kw{match}~b~\kw{with}~\kw{true} \rightarrow \kw{false}~|~\kw{false} \rightarrow \kw{true}$).
+Un bloc peut être une suite d'instruction $[s_1 \| \cdots s_n]$ 
+exécutées en parallèle. Chaque instruction produit un 
+effets de bord : assignation d'une variable (eg. $x \leftarrow 17$) 
+ou branchement (eg. $\kw{goto}~\ell$). Les étiquettes cibles des 
+branchements sont déclarées par la construction de bloc $~\kw{labels}~\ell_1:\Block_1~\cdots~\ell_n:~\Block_n~\kw{in}~\Block$. Par exemple, 
+le programme $(~\kw{labels}~\ell:42~\kw{in}~\kw{goto}~\ell)$, calcule 
+la valeur 42.
+Grâce à la construction \kw{labels}, \textsf{GO2B} peut exprimer 
+des calculs qui bouclent.
+\newpage
+Par exemple :
+
+\begin{lstlisting}
+$\kw{let}~\textsf{IsEven} = \kw{fun}~n \rightarrow$
+$\quad\kw{labels}~\textsf{even}:\kw{if}~n = 0~\kw{then}~\textsf{true}~\kw{else}~[n \leftarrow n-1\|~\kw{goto}~\textsf{odd}]$
+$\qquad\qquad\textsf{odd}\;:\kw{if}~n = 0~\kw{then}~\textsf{false}~\kw{else}~[n \leftarrow n-1\|~\kw{goto}~\textsf{even}]$
+$\quad\kw{in}~[~\kw{goto}~\textsf{even}~]\textsf{;;}$
+
+$\textsf{IsEven}(42)$
+\end{lstlisting}
+
+Qui dit boucle dit durée d'exécution, voire non-terminaison 
+(eg. $\kw{labels}~\ell:[\kw{goto}~\ell]~\kw{in}~\kw{goto}~\ell$). 
+L'exécution d'un bloc étant alors intrinsèquement séquentielle, 
+on introduit dans le langage de bloque un squelette de parallélisme :
+\begin{center}
+$\kw{sync}~x_1 = \Block_1~\kw{and}~\cdots~x_n = \Block_n~\kw{in}~\Block$
+\end{center}
+
+qui permet la mise en parallèle des blocs $\Block_i$, 
+par une barrière de synchronisation : les valeurs 
+des blocs $\Block_i$ sont liées au variables $x_i$, 
+et peuvent être combinées dans le bloc $\Block$ interne.
+Par exemple :
+
+\begin{lstlisting}
+$\kw{let}~\textsf{Fact} = \kw{fun}~n \rightarrow$
+$\quad\kw{labels}~f:\kw{if}~n = 0~\kw{then}~\textsf{acc}~\kw{else}~[\textsf{acc} \leftarrow \textsf{acc} \times n~\|~n \leftarrow n-1\|~\kw{goto}~f]~\kw{in}$
+$\quad[\textsf{acc} \leftarrow 1~\|~\kw{goto}~f]\textsf{;;}$
+
+$\kw{sync}~x = \textsf{Fact}(6)~\kw{and}~\textsf{Fact}(14)~\kw{in}~x + y\textsf{;;}$
+\end{lstlisting}
+
+
+\subsection{Sémantique}
+
+
+Cette section présente une sémantique opérationnelle 
+à grands pas pour \textsf{GO2B}. 
+
+
+\paragraph{Notations}
+La relation d'évaluation est définie 
+par un système de règles d'inférence de la forme :
+\begin{mathpar}
+  \inferrule[]
+            {P_1 \\ \cdots \\ P_n}
+            {P}%%%(x_1, \cdots x_m)
+\end{mathpar}
+
+Ces règles se lisent \og si %%%, étant donnés les noms frais $x_1,\cdots x_m$,
+les prémisses $P_1 \cdots P_n$ sont vraies, 
+alors la conclusion $P$ est vraie \fg.
+
+\paragraph{Valeurs et fermetures}
+L'ensemble des valeurs se limite aux constantes de \textsf{GO2B}. 
+On introduit de plus une autre sorte d'objet appelée 
+\emph{fermeture}\footnote{On emploie des fermetures pour assurer
+ la portée lexicale. Cependant, un renommage des noms de machines 
+ en sorte que chaque déclaration ait un nom unique permet 
+ d'expliciter la liaison statique : la représentation des
+  environnements à \emph{runtime} n'est donc pas nécessaire.}. 
+Une fermeture, notée $\#\pair{(x_1,\cdots x_n) \rightarrow \mathcal{M}, \rho}$,
+inclut le code d'une fonction ~~$\kw{fun}~(x_1,\cdots x_n) \rightarrow \Block$~~et
+son environnement de définition~$\rho$.
+
+\paragraph{Environnements}
+Un environnement est une fonction partielle des noms vers les valeurs 
+ou les fermetures. On note $\textsf{dom}(\rho)$ le domaine de 
+l'environnement~$\rho$ et $\rho(x)$ l'objet associé à $x$ dans $\rho$. 
+Un environnement vide est noté $\emptyset$. L'extension d'un environnement 
+$\rho$ avec la liaison de $x$ à $v$ est notée $\envExtend{\rho}{x}{v}$. 
+On a alors $\rho[x \mapsto v](x) = v$ et $\rho[x \mapsto v](y) = \rho(y)$
+si $x$ et $y$ sont des noms différents. L'opération $\rho[x \mapsto v]$ 
+est associative à gauche. En particulier $\rho[x \mapsto v][x \mapsto v'](x) = v'$.
+On utilise l'abréviation $\rho[x_1 \mapsto v_1, \cdots x_n \mapsto v_n]$
+pour désigner l'environnement $\rho[x_1 \mapsto v_1] \cdots [x_n \mapsto v_n]$. 
+On note $\rho(x) = v$ la liaison de $x$ à $v$ dans $\rho$ ; on a alors 
+$\rho(x) = v \Rightarrow x \in \textsf{dom}(\rho)$. L'exécution d'un
+programme \textsf{GO2B} met en jeu deux sortes d'environnements :
+un \emph{environnement de machines} d'une part, lequel ne contient
+que des fermetures, et des \emph{blocs d'activation} d'autre part, 
+qui ne contiennent que des valeurs.
+
+\paragraph{Atome}
+Le jugement $~\GTBsemAtom{\mathcal{F}}{a}{v}~$ signifie 
+\og dans l'environnement d'exécution $\rho$, l'atome $a$ 
+s'évalue vers la valeur~$v$ \fg. L'environnement d'exécution $\rho$ 
+stocke les valeurs des variables du programmes. Le jugement 
+$\vdash_\textsf{prim}\sem{p}(v_1,\cdots v_n) \Rightarrow v$ signifie \og 
+la primitive $p$ appliquée aux valeurs $v_1,\cdots v_n$ s'évalue 
+(sans erreur) vers la valeur~$v$ \fg. L'exécution d'un atome est 
+supposée instantanée\footnote{En fait, la fréquence de l'horloge 
+dépend de la taille de l'atome le plus \og gros \fg, celui dont 
+l'exécution dure le plus longtemps. Dans le cas où il serait 
+nécessaire de réduire cette durée, le programmeur ou le compilateur
+ peut recourir à des signaux temporaires pour séquentialiser 
+ l'exécution de certains atomes, en s'appuyant potentiellement
+  sur une analyse statique.}.
+\begin{mathpar}
+ \inferrule[Const]
+            {}
+            {\GTBsemAtom{\rho}{c}{c}}
+  \and 
+  \inferrule[Ident]
+            {\rho(x) = v}
+            {\GTBsemAtom{\rho}{x}{v}}
+  \and 
+  \inferrule[Prim]
+            {\GTBsemAtom{\rho}{a_1}{v_1} \qquad \cdots \GTBsemAtom{\rho}{a_n}{v_n} \\
+             \GTBsemPrim{\sem{p}(v_1,\cdots v_n)}{v} }
+            {\GTBsemAtom{\rho}{p~a_1~\cdots~a_n}{v}} \\
+\end{mathpar}
+
+\paragraph{Programme}
+Le jugement $~\GTBsemProg{\rho}{\pi}{v}~$ signifie \og dans l'environnement d'exécution $\rho$, le programme $\pi$ s'évalue vers la valeur~$v$ en $t$ cycles d'horloge \fg.
+
+\begin{mathpar}
+  \inferrule[Let]
+            {\GTBsemProg{\envExtend{\rho}{X}{\#\pair{f,\rho}}}{~\pi~}{v,t}}
+            {\GTBsemProg{\rho}{~\kw{let}~X = f~\kw{;;}~\pi~}{v,t}}
+  \and
+  \inferrule[Prog]
+            {\GTBsemeval{\rho}{~\Block~}{\rho',t} \\ \rho'(\kw{res}) = v}
+            {\GTBsemProg{\rho}{~\Block~}{v,t}}
+  \and
+\end{mathpar}
+
+Le jugement $~\GTBsemeval{\rho}{\Block}{v,t}~$ signifie \og 
+dans l'environnement d'exécution $\rho$, le bloc $\Block$ 
+s'évalue vers la valeur~$v$ en $t$ cycles d'horloge \fg.
+\begin{mathpar}
+  \inferrule[Eval]
+            {\GTBsemBlock{\emptyset,\rho}{~\Block~}{\rho',t} \\ \rho'(\kw{res}) = v}
+            {\GTBsemeval{\rho}{~\Block~}{v,t}}
+\end{mathpar}
+
+
+\paragraph{Bloc}
+Le jugement $~\GTBsemBlock{\Labels,\rho}{\Block}{\rho',t}~$ signifie
+ \og dans l'ensemble de blocs étiquetés $\Labels$ et l'environnement 
+ d'exécution $\rho$, le bloc $\Block$ produit l'environnement 
+ d'exécution $\rho'$ en $t$ cycles d'horloge \fg.
+
+\begin{mathpar}
+  \inferrule[Atom]
+            {\GTBsemAtom{\rho}{a}{v}}
+            {\GTBsemBlock{\Labels,\rho}
+                         {~a~}
+                         {\rho[\kw{res} \mapsto v],1}}
+  \and
+  \inferrule[Apply]
+            { \rho(X) = \#\pair{\kw{fun}~(x_1, \cdots x_n)\rightarrow \Block,\rho'}\\\\
+              \GTBsemAtom{\rho}{a_1}{v_1} \qquad \cdots \qquad\GTBsemAtom{\rho}{a_n}{v_n}\\
+              \GTBsemeval{\rho'[x_1 \mapsto v_1, \cdots x_n \mapsto v_n]}{\Block}{v,t}}
+            { \GTBsemBlock{\Frame}
+                          {~X(a_1~\cdots~a_n)~}
+                          {\rho[\kw{res} \mapsto v],1+t} }\\
+\end{mathpar}
+\begin{mathpar}
+  \inferrule[If-true]
+            { \GTBsemAtom {\Labels,\rho}{a}{\kw{true}}\\ 
+              \GTBsemBlock{\Labels,\rho}{~\Block~}{\rho',t}}
+            { \GTBsemBlock{\Labels,\rho}
+                          {~\kw{if}~a~\kw{then}~\Block~\kw{else}~\Block'~}
+                          {\rho',t}}
+  \and
+  \inferrule[If-false]
+            { \GTBsemAtom{\Labels,\rho}{a}{\kw{false}}\\ 
+              \GTBsemBlock{\Labels,\rho}{~\Block'~}{\rho',t}}
+            { \GTBsemBlock{\Labels,\rho}
+                          {~\kw{if}~a~\kw{then}~\Block~\kw{else}~\Block'~}
+                          {\rho',t} }
+  \and
+  \inferrule[Match]
+            { \GTBsemAtom{\Labels,\rho}{a}{c_i}\\
+              \GTBsemBlock{\Labels,\rho}{~\Block_i~}{\rho',t} }
+            { \GTBsemBlock{\Labels,\rho}
+                          {~\kw{match}~a~\kw{with}~c_1 \rightarrow \Block_1~|~c_n \rightarrow \Block_n~}
+                          {\rho',t} }
+  \and
+  \inferrule[Labels]
+            { \GTBsemBlock{\Labels[\ell_1 \mapsto \Block_1, \cdots~\ell_n\mapsto\Block_n],\rho}
+                          {~\Block~}
+                          {\rho',t} }
+            { \GTBsemBlock{\Labels,\rho}
+                          {~\kw{labels}~\ell_1:\Block_1~\cdots~\ell_n:~\Block_n~\kw{in}~\Block~}
+                          {\rho',t} } 
+  \and
+   \inferrule[Sync]
+            { \GTBsemeval{\rho}{~\Block_1~}{v_1,t_1}
+              \qquad \cdots \qquad
+              \GTBsemeval{\rho}{~\Block_n~}{v_n,t_n}\\
+              \GTBsemeval{\rho[x_1 \mapsto v_1, \cdots x_n \mapsto v_n]}{~\Block~}{\rho',t} }
+            { \GTBsemBlock{\Labels,\rho}{~\kw{sync}~x_1 = \Block_1~\kw{and}~\cdots~x_n = \Block_n~\kw{in}~\Block~}{\rho',~\max(t_1,\cdots t_n) + t} }
+  \and
+  \inferrule[Seq]
+            { \GTBsemBlock{\Labels,\rho}{~\Block~}{\rho',t}\\ 
+              \GTBsemBlock{\Labels,\rho'}{~\Block'~}{\rho'',t'} }
+            { \GTBsemBlock{\Labels,\rho}
+                          {~\Block~;~\Block'~}
+                          {\rho'',t+t'} }
+\end{mathpar}
+
+\paragraph{Composition parallèle}  
+~~~~~~~~
+\begin{mathpar}
+  \inferrule[Next]
+            { \GTBsemPar{\Labels,\rho[\kw{pc} \mapsto \textsf{none}, \kw{res} \mapsto  \textsf{none}]}
+                        {~[s_1\| \cdots s_n]~}
+                        {\rho'}\\ 
+              \rho(\kw{pc}) = \ell \not= \textsf{none}\\ 
+              \Labels(\ell) = \Block\\ 
+              \GTBsemBlock{\Labels,\rho'[\kw{pc} \mapsto \ell]}
+                          {~\Block~}
+                          {\rho'',t} }
+            { \GTBsemBlock{\Labels,\rho}
+                          {~[s_1\| \cdots s_n]~}
+                          {\rho'',1+t} }
+  \and
+  %\inferrule[Continue]
+  %          {\GTBsemPar{\Labels,\rho[\kw{pc} \mapsto \textsf{none}, \kw{res} \mapsto  \textsf{none}]}
+  %                     {~[s_1\| \cdots s_n]~}
+  %                     {\rho'}\\ 
+  %           \rho'(\kw{pc}) = \textsf{none}\\ 
+  %           \rho(\kw{pc}) = \ell\\
+  %           \Labels(\ell) = \Block\\ 
+  %           \GTBsemBlock{\Labels,\rho'[\kw{pc} \mapsto \ell]}
+  %                       {~\Block~}
+  %                       {\rho'',t} }
+  %          {\GTBsemBlock{\Labels,\rho}
+  %                       {~[s_1\| \cdots s_n]~}
+  %                       {\rho'',1+t}}
+  %\and
+  \inferrule[Par]
+            { \textsf{sanity-check}[s_1,\cdots s_n]\\
+              \GTBsemStat{\rho}{~s_1~}{\{x_1 \mapsto v_1\}}
+              \qquad \cdots \qquad 
+              \GTBsemStat{\rho}{~s_n~}{\{x_n \mapsto v_n\}} }
+            { \GTBsemBlock{\Labels,\rho}
+                          {~{[s_1\| \cdots s_n]}~}
+                          {\rho[x_1 \mapsto v_1, \cdots x_n \mapsto v_n]} }
+\end{mathpar}
+
+La détection des branchements multiples et assignations 
+de la même variable dans une même composition parallèle 
+se fait statiquement, comme ceci :
+
+ $\textsf{sanity-check}[s_1,\cdots s_n] : \forall (i,j) \in \{1, \cdots n\}^2 \cdot$
+ $\left\{\begin{array}{l}
+ s_i = [x \leftarrow a] \land s_j = [x' \leftarrow a'] \Rightarrow x = x') \\
+ s_i = [\kw{goto}~\ell] \land s_j = [\kw{goto}~\ell] \Rightarrow \ell = \ell')\\
+ \end{array}\right.$
+
+\paragraph{Instruction}
+Le jugement $~\GTBsemStat{\rho}{s}{\rho',t}~$ signifie \og 
+dans l'environnement d'exécution $\rho$, l'instruction $s$ 
+produit la liaison $\{x \mapsto v\}$ en 1 cycle d'exécution \fg.
+
+\begin{mathpar}
+  \inferrule[Goto]
+			{}
+			{\GTBsemStat{\rho}
+			            {~\kw{goto}~\ell~}
+			            {\{\kw{pc} \mapsto \ell\}}}
+  \and  
+  \inferrule[Assign]
+            {\GTBsemAtom{\rho}{a}{v}} 
+            {\GTBsemStat{\rho}{~x \leftarrow~a~}{\{x \mapsto v\}}} 
+\end{mathpar}
+
+
+\end{document}

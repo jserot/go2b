@@ -8,7 +8,7 @@ build:
 #	dune build src/bin/go2b_top.bc
 
 examples:
-	dune build examples/ex1/main.bc
+	dune build examples/ex3/main.bc
 
 utop:
 	dune utop src/lib

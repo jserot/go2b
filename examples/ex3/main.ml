@@ -1,37 +1,25 @@
 open Go2b
 open Syntax
 
-let m_fact =
-  MCompute (
-      ["acc"; "n"],
-      Par [
-            Assign ("acc", AConst (CInt 1)); 
-            Assign ("n", AVar "N");
-            Goto "f"
-          ],
-      ["f", Cond (APrimApp ("=", [AVar "n"; AConst (CInt 0)]),
-                     Return (AVar "acc"),
-                     Par [Assign ("acc", APrimApp ("*", [AVar "acc"; AVar "n"]));
-                          Assign ("n", APrimApp ("-", [AVar "n"; AConst (CInt 1)]))])]
-    )
-                                  
-let m_main =
-  MCompute (
-      [],
-      Sync (
-          [ "r1", MInst ("fact", [AVar "x"]);
-            "r2", MInst ("fact", [APrimApp ("+", [AVar "x"; AConst (CInt 1)])]) ],
-          Return (APrimApp ("+", [AVar "r1"; AVar "r2"]))),
-      []
-    )
-
+let fact = 
+  let_ "Fact"
+    (func ["n"] 
+      (labels 
+        [ "f", if_ (prim "<=" [var "n"; int 0])
+                      (a_ (var "acc"))
+                      (par [ "acc" <= (prim "*" [var "n";var "acc"]) ;  
+                             "n" <= (prim "-" [var "n"; int 1]);
+                              goto "f" ]) ]
+        (par ["acc" <= (int 1) ; goto "f"])))
+                             
 let p = {
-    decls = [
-      MDecl ("fact", (["N"], m_fact));
-      MDecl ("main", (["x"], m_main));
-    ];
-    entry = ("main", [CInt 4])
+    decls = [ fact ];
+    entry = sync ["x", app "Fact" [int 5];
+                  "y", app "Fact" [int 8]] 
+              (a_ (prim "+" [var "x"; var "y"]))
   }
+
+ (* fact(5) + fact(8) ~> 40440 *)
 
 let _ = 
   Printf.printf "------\n%s\n-------\n" (string_of_program p);
