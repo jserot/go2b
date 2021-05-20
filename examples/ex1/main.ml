@@ -1,27 +1,21 @@
 open Go2b
 open Syntax
 
-let m_fact =
+let m_incr =
+  (* compute var x in [x<=n || goto l] with l:return x+1 *)
   MCompute (
-      ["acc"; "n"],
-      Par [
-            Assign ("acc", AConst (CInt 1)); 
-            Assign ("n", AVar "N");
-            Goto "f"
-          ],
-      ["f", Cond (APrimApp ("=", [AVar "n"; AConst (CInt 0)]),
-                     Return (AVar "acc"),
-                     Par [Assign ("acc", APrimApp ("*", [AVar "acc"; AVar "n"]));
-                          Assign ("n", APrimApp ("-", [AVar "n"; AConst (CInt 1)]))])]
+      ["x"],
+      Par [Assign ("x", AVar "n"); Goto "l" ],
+      ["l", Return (APrimApp ("+", [AVar "x"; AConst (CInt 1)]))]
     )
                                   
 let p = {
-    decls = [
-      MDecl ("fact", (["N"], m_fact));
-    ];
-    entry = ("fact", [CInt 3])
+    decls = [ MDecl ("incr", (["n"], m_incr)); ];
+    entry = ("incr", [CInt 2])
   }
 
-let v, t =
-  let p1 = p in
-  Sem.eval_prog p1   
+let _ = 
+  let v, t = Sem.eval_prog p in
+  Printf.printf "result=%s at t=%d\n" (Sem.string_of_val v) t
+
+    
