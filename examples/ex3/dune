@@ -1,0 +1,5 @@
+(executable
+ (name main)
+ (modes byte)
+ (modules main)
+ (libraries go2b))
