@@ -7,6 +7,11 @@ type semval =
   | Bool of bool
   | Unknown
 
+let string_of_val = function
+  | Int i -> string_of_int i
+  | Bool b -> string_of_bool b
+  | Unknown -> "<unknown>"
+             
 let encode_int n =
     Int n
 let decode_int = function
@@ -88,11 +93,11 @@ let rec eval_instr o f s =
      let v = eval_atom f a in
      { f with res = v; pc = f.stopc }
   | Assign (x,a) ->
-     if List.mem_assoc x f.lvars then
+     (* if List.mem_assoc x f.lvars then *)  (* TO BE FIXED ! *) 
        let v = eval_atom f a in
        { f with lvars = Misc.update_assoc f.lvars (x,v) }
-     else
-       raise (Aie (x,a))
+     (* else
+      *   raise (Aie (x,a)) *)
   | Cond (a, s, s') ->
      begin match eval_atom f a with
      | Bool true -> eval_instr o f s
