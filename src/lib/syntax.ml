@@ -26,7 +26,7 @@ and instr =
   | Goto of label
   | Return of atom
   | Let of var * mdecl * instr  (* let m = fun (x1, ..., xn) -> M in s *)
-  | Join of machine list * var list * instr (* join [M1, ..., Mn] with (x1, ..., xn) -> s *)
+  | Sync of (var * machine) list * instr (* sync x1=M1 and ... and xn=Mn in s *)
   | Nil (* Nothing : associated to terminal block *)
 
 and mdecl = var list * machine  (* fun (x1, ..., xn) -> M *)
